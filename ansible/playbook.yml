@@ -1,0 +1,41 @@
+---
+- name: Setup BIND DNS Server
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install BIND packages
+      dnf:
+        name:
+          - bind
+          - bind-utils
+        state: present
+
+    - name: Copy named.conf
+      copy:
+        src: etc/named.conf
+        dest: /etc/named.conf
+        owner: root
+        group: named
+        mode: '0640'
+
+    - name: Copy loc.internal.zone
+      copy:
+        src: var/named/loc.internal.zone
+        dest: /var/named/loc.internal.zone
+        owner: root
+        group: named
+        mode: '0640'
+
+    - name: Copy 0.168.192.in-addr.arpa.zone
+      copy:
+        src: var/named/0.168.192.in-addr.arpa.zone
+        dest: /var/named/0.168.192.in-addr.arpa.zone
+        owner: root
+        group: named
+        mode: '0640'
+
+    - name: Enable and start BIND service
+      systemd:
+        name: named
+        enabled: yes
+        state: started
