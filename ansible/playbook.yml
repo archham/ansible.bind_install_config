@@ -18,6 +18,20 @@
         group: named
         mode: '0640'
 
+    - name: Update listen-on in named.conf
+      lineinfile:
+        path: /etc/named.conf
+        regexp: 'listen-on port 53 {.*};'
+        line: "listen-on port 53 { {{ ansible_all_ipv4_addresses | join('; ') }}; };"
+        state: present
+
+    - name: Update listen-on-v6 in named.conf
+      lineinfile:
+        path: /etc/named.conf
+        regexp: 'listen-on-v6 port 53 {.*};'
+        line: "listen-on-v6 port 53 { {{ ansible_all_ipv6_addresses | join('; ') }}; };"
+        state: present
+
     - name: Copy loc.internal.zone
       copy:
         src: var/named/loc.internal.zone
