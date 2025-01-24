@@ -1,6 +1,6 @@
 ---
-- name: Setup BIND DNS Server
-  hosts: all
+- name: Setup BIND DNS Server Slave
+  hosts: dns2,dns3
   become: yes
   tasks:
     - name: Install BIND packages
@@ -18,38 +18,94 @@
         group: named
         mode: '0640'
 
-    - name: Update listen-on in named.conf
+    - name: Change zone type to slave in named.conf
+      replace:
+        path: /etc/named.conf
+        regexp: 'type master;'
+        replace: 'type slave;'
+        backup: yes
+
+    - name: Ensure file path remains unchanged
+      replace:
+        path: /etc/named.conf
+        regexp: 'file\s+"(.*?)\.zone";'
+        replace: 'file "\1.zone";'
+        backup: yes
+
+    - name: Ensure masters directive is correctly placed at the end of each zone
+      replace:
+        path: /etc/named.conf
+        regexp: '(\s*allow-transfer\s*{[^}]+};)(\s*\n\s*})'
+        replace: '\1\n    masters {\n      192.168.0.207 key transfer-key;\n    };\2'
+        backup: yes
+
+    - name: Update listen-on-4 in named.conf
       lineinfile:
         path: /etc/named.conf
         regexp: 'listen-on port 53 {.*};'
-        line: "listen-on port 53 { {{ ansible_all_ipv4_addresses | join('; ') }}; };"
+        line: "        listen-on port 53 { 127.0.0.1; {{ ansible_all_ipv4_addresses | join('; ') }}; };"
         state: present
+        backrefs: yes
 
     - name: Update listen-on-v6 in named.conf
       lineinfile:
         path: /etc/named.conf
         regexp: 'listen-on-v6 port 53 {.*};'
-        line: "listen-on-v6 port 53 { {{ ansible_all_ipv6_addresses | join('; ') }}; };"
+        line: "        listen-on-v6 port 53 { ::1; {{ ansible_all_ipv6_addresses | join('; ') }}; };"
         state: present
+        backrefs: yes
 
-    - name: Copy loc.internal.zone
-      copy:
-        src: var/named/loc.internal.zone
-        dest: /var/named/loc.internal.zone
-        owner: root
+    - name: Update zone file paths to "slaves/"
+      replace:
+        path: /etc/named.conf
+        regexp: 'file\s+"(.*?)\.zone";'
+        replace: 'file "slaves/\1.zone";'
+        backup: yes
+
+    - name: Check BIND configuration with named-checkconf
+      command: named-checkconf
+      register: checkconf_result
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Fail if named-checkconf detects errors
+      fail:
+        msg: "BIND configuration check failed! Check /etc/named.conf for errors."
+      when: checkconf_result.rc != 0
+
+    - name: Create log directory for BIND
+      file:
+        path: /var/named/log/
+        state: directory
+        owner: named
         group: named
-        mode: '0640'
-
-    - name: Copy 0.168.192.in-addr.arpa.zone
+        mode: '0700'
+   
+    - name: Copy dnstap logrotate file
       copy:
-        src: var/named/0.168.192.in-addr.arpa.zone
-        dest: /var/named/0.168.192.in-addr.arpa.zone
+        src: etc/logrotate.d/dnstap
+        dest: /etc/logrotate.d/dnstap
         owner: root
-        group: named
-        mode: '0640'
+        group: root
+        mode: '0644'
 
-    - name: Enable and start BIND service
+    - name: Copy named logrotate file
+      copy:
+        src: etc/logrotate.d/named
+        dest: /etc/logrotate.d/named
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Ensure DNS service is allowed through the firewall
+      ansible.posix.firewalld:
+        service: dns
+        permanent: yes
+        state: enabled
+        immediate: yes
+
+    - name: Restart BIND service
       systemd:
         name: named
+        state: restarted
         enabled: yes
-        state: started
