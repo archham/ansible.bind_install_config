@@ -1,0 +1,13 @@
+/var/named/data/dnstap.bin {
+    daily
+    rotate 30
+    missingok
+    notifempty
+    copytruncate
+    nocompress
+    su named named
+    create 0644 named named
+    postrotate
+        systemctl restart named
+    endscript
+}
