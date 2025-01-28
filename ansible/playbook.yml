@@ -12,7 +12,7 @@
 
     - name: Copy named.conf
       copy:
-        src: etc/named.conf
+        src: ../etc/named.conf
         dest: /etc/named.conf
         owner: root
         group: named
