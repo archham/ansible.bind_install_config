@@ -83,7 +83,7 @@
    
     - name: Copy dnstap logrotate file
       copy:
-        src: etc/logrotate.d/dnstap
+        src: ../etc/logrotate.d/dnstap
         dest: /etc/logrotate.d/dnstap
         owner: root
         group: root
@@ -91,7 +91,7 @@
 
     - name: Copy named logrotate file
       copy:
-        src: etc/logrotate.d/named
+        src: ../etc/logrotate.d/named
         dest: /etc/logrotate.d/named
         owner: root
         group: root
